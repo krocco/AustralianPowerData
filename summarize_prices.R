@@ -2,24 +2,33 @@ library(dplyr)
 
 library(data.table)
 library(lubridate)
-setwd('d:/Power')
-fileList <- list.files(pattern="DATA*.*")
-print(fileList)
-locations = c("NSW","QLD","SA","SNOWY","VIC","TAS")
-NSW <- fileList[grep("NSW", fileList)]
-QLD <- fileList[grep("QLD", fileList)]
-SA <- fileList[grep("SA", fileList)]
-SNOWY <- fileList[grep("SNOWY", fileList)]
-VIC <- fileList[grep("VIC", fileList)]
-TAS <- fileList[grep("TAS", fileList)]
 
-temporary <- lapply(NSW, fread, sep=",")
-nsw <- data.table(rbindlist(temporary))
-nsw[,SETTLEMENTDATE:=substr(SETTLEMENTDATE,1,10)]
-nsw[,DATE:= ymd(SETTLEMENTDATE)]
-nsw <- tbl_df(nsw)
-nsw <- mutate(nsw, SPEND = TOTALDEMAND*RRP)
-#nsw <- mutate(nsw, DAY = as.numeric(as.POSIXct(DATE)))
-#nsw <- mutate(nsw, year = year(DATE), month = month(DATE), day = day(DATE))  #works
-nsw_grouped <- group_by(nsw, DATE)
-nsw_summary <- summarize(nsw_grouped, Price = (sum(SPEND)/sum(TOTALDEMAND)))
+fileList <- list.files(pattern="DATA*.*")
+
+ALL <- lapply(fileList, fread, sep=",")
+everything <- data.table(rbindlist(ALL))
+rm("ALL")
+
+everything[,SETTLEMENTDATE := substr(SETTLEMENTDATE,1,10)]
+everything[,date := ymd(SETTLEMENTDATE)]
+everything <- tbl_df(everything)
+allData <- 
+        everything %>%
+        mutate(spend = TOTALDEMAND * RRP) %>%
+        mutate(day = as.POSIXct(date)) %>%
+        mutate(year = year(date), month = month(date), day = day(date), week = week(date))
+
+
+regional <- 
+        allData %>%
+        group_by(date, REGION) %>%
+        summarize(price = (sum(spend)/sum(TOTALDEMAND)))
+
+
+national <-
+        allData %>%
+        group_by(date) %>%
+        summarize(price = (sum(spend)/sum(TOTALDEMAND)))
+
+write.csv(regional, file = "regionalSummary.csv", row.names = FALSE)
+write.csv(national, file = "nationalSummary.csv", row.names = FALSE)
